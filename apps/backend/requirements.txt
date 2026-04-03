@@ -1,0 +1,15 @@
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.1.1
+PyJWT==2.12.1
+python-dotenv==1.0.0
+PyMySQL==1.1.0
+cryptography
+SQLAlchemy==2.0.23
+opencv-python
+numpy
+onnxruntime
+Pillow
+requests
+python-multipart
+Werkzeug

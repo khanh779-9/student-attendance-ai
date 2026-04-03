@@ -1,0 +1,35 @@
+@import '@fontsource/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+}
+
+.hidden-canvas {
+  display: none;
+}
+
+.video-mirror {
+  transform: scaleX(-1);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea {
+  @apply rounded-lg border-0 ring-1 ring-inset ring-slate-300 bg-white px-3 py-1 shadow-sm focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-all duration-200;
+}
