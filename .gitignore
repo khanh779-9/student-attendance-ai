@@ -33,8 +33,6 @@ apps/frontend/.vite/
 
 # Environment files
 .env
-.env.*
-!.env.example
 apps/frontend/.env
 apps/backend/.env
 
