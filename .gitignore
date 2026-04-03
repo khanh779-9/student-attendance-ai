@@ -36,9 +36,7 @@ apps/frontend/.vite/
 .env.*
 !.env.example
 apps/frontend/.env
-apps/frontend/.env.*
 apps/backend/.env
-apps/backend/.env.*
 
 # Build / coverage
 coverage/
