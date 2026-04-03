@@ -73,11 +73,15 @@ class FaceRecognitionService:
             return None
 
         confidence = round(best_similarity, 4)
+        distance = round(1 - confidence, 4)
+        threshold = round(threshold, 4)
         return {
             "face_data": best_data,
             "cosine_similarity": confidence,
             "accepted": confidence > (1 - threshold),
             "confidence": confidence,
+            "distance": distance,
+            "threshold": threshold
         }
 
     def extract_embedding(self, image_path):
