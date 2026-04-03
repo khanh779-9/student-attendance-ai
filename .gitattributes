@@ -1,2 +1,4 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
 *.onnx filter=lfs diff=lfs merge=lfs -text
+Model/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+Model/**/*.pt filter=lfs diff=lfs merge=lfs -text

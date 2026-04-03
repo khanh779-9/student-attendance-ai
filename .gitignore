@@ -42,3 +42,4 @@ apps/backend/.env
 coverage/
 *.coverage
 htmlcov/
+
