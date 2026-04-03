@@ -1,6 +1,6 @@
 ﻿# Hệ thống điểm danh nhận diện khuôn mặt bằng AI
 
-Làm đồ án báo cáo với thầy Vinh 
+Làm đồ án báo cáo với thầy Vinh =))
 
 Giai đoạn 1: Thử nghiệm pp trích đặc trưng (ko train)
 
