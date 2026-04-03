@@ -1,6 +1,8 @@
 ﻿# Hệ thống điểm danh nhận diện khuôn mặt bằng AI
 
-Làm đồ án báo cáo với thầy Vinh
+Làm đồ án báo cáo với thầy Vinh 
+
+Giai đoạn 1: Thử nghiệm pp trích đặc trưng (ko train)
 
 ## 1. Tổng quan
 
@@ -144,7 +146,7 @@ Sau khi chạy `python seed.py`, có thể đăng nhập bằng:
 - MSGV: `GV001`
 - Mật khẩu: `123`
 
-## 9. Luồng sử dụng nhanh
+## 9. Luồng sử dụng
 
 1. Đăng nhập bằng tài khoản giảng viên.
 2. Tạo lớp học ở trang Quản lý lớp.
@@ -154,7 +156,7 @@ Sau khi chạy `python seed.py`, có thể đăng nhập bằng:
 6. Dùng camera hoặc ảnh để check-in.
 7. Xem thống kê và lịch sử điểm danh.
 
-## 10. Scripts thường dùng
+## 10. Script
 
 ### Frontend
 
