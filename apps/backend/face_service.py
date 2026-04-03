@@ -55,9 +55,8 @@ class ArcFaceEmbedder:
         
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, size)
-        # ArcFace normalization per reference implementation
         img = (img.astype(np.float32) - 127.5) / 128.0
-        return img[np.newaxis, ...]  # Batch dimension
+        return img[np.newaxis, ...]
 
     def get_embedding(self, img_path: str) -> Optional[np.ndarray]:
         """Extract normalized face embedding from image.
@@ -72,15 +71,13 @@ class ArcFaceEmbedder:
         if input_blob is None:
             return None
         
-        # Run ONNX inference
         embedding = self.session.run(
             [self.output_name], {self.input_name: input_blob}
         )[0][0]
         embedding = embedding.astype(np.float32)
         
-        # Normalize with robust numerical stability
         norm = np.linalg.norm(embedding)
-        if norm < 1e-10:  # Avoid division by zero
+        if norm < 1e-10:
             return None
         return embedding / norm
 
@@ -167,18 +164,15 @@ class FaceRecognitionService:
 
         threshold = float(threshold)
 
-        # Filter and normalize candidate embeddings
         candidates = []
         vectors = []
 
         for data in enrolled_embeddings:
             vec = np.asarray(data["embedding"], dtype=np.float32).reshape(-1)
             
-            # Validate dimension compatibility
             if vec.size != query.size:
                 continue
             
-            # Normalize with stability check
             normalized = self._safe_normalize(vec)
             if normalized is None:
                 continue
@@ -189,21 +183,16 @@ class FaceRecognitionService:
         if not vectors:
             return None
 
-        # Vectorized cosine similarity computation: matrix @ query
-        # where matrix shape is (num_candidates, embedding_dim)
         matrix = np.vstack(vectors)
-        scores = matrix @ query  # Shape: (num_candidates,)
+        scores = matrix @ query
         
-        # Find best match
         best_idx = int(np.argmax(scores))
         best_score = float(scores[best_idx])
         best_match = candidates[best_idx]
 
-        # Compute distance as complement of similarity
         dist_value = max(0.0, 1.0 - best_score)
         is_accepted = best_score >= threshold
         
-        # Round for API response
         sim_score = round(best_score, 4)
         dist_score = round(dist_value, 4)
         threshold_rounded = round(threshold, 4)
@@ -211,8 +200,8 @@ class FaceRecognitionService:
         return {
             "face_data": best_match,
             "similarity": sim_score,
-            "cosine_similarity": sim_score,  # Backward compatible key
-            "confidence": sim_score,  # Backward compatible key
+            "cosine_similarity": sim_score,
+            "confidence": sim_score,
             "distance": dist_score,
             "threshold": threshold_rounded,
             "accepted": is_accepted,
