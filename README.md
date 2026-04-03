@@ -8,17 +8,9 @@ Giai đoạn 1: Thử nghiệm pp trích đặc trưng (ko train)
 
 Dự án gồm 2 cục:
 
-- Backend: Python Flask, SQLAlchemy, MySQL, ONNX Runtime (cụ thể là ArcFace)
-- Frontend: React, Vite, Tailwind CSS
 
 Chức năng:
 
-- Đăng nhập giảng viên
-- Quản lý lớp học, sinh viên
-- Đăng ký khuôn mặt sinh viên
-- Tạo buổi học và điểm danh bằng nhận diện khuôn mặt
-- Xem thống kê, lịch sử điểm danh
-- Vân vân và mây mây
 
 ## 2. Cấu trúc thư mục
 
@@ -38,13 +30,9 @@ NhanDien_HinhAnh
 
 ### 3.1 Backend
 
-- Python 3.8 trở lên
-- MySQL 8 trở lên
 
 ### 3.2 Frontend
 
-- Node.js 18 trở lên
-- npm
 
 ## 4. Cài đặt cơ sở dữ liệu
 
@@ -81,7 +69,7 @@ DATABASE_NAME=class_student_attendance
 JWT_SECRET_KEY=your_secret_key
 ARCFACE_MODEL_PATH=../../Model/Arcface/arc.onnx
 YOLO_MODEL_PATH=../../Model/Yolo/yolov10s.onnx
-FACE_RECOGNITION_THRESHOLD=0.04223
+FACE_RECOGNITION_THRESHOLD=0.68
 FLASK_ENV=development
 ```
 
@@ -143,8 +131,6 @@ Sau khi chỉnh biến môi trường, cần khởi động lại frontend.
 
 Sau khi chạy `python seed.py`, có thể đăng nhập bằng:
 
-- MSGV: `GV001`
-- Mật khẩu: `123`
 
 ## 9. Luồng sử dụng
 
@@ -160,10 +146,6 @@ Sau khi chạy `python seed.py`, có thể đăng nhập bằng:
 
 ### Frontend
 
-- `npm run dev`: chạy môi trường phát triển
-- `npm run build`: build production
 
 ### Backend
 
-- `python app.py`: chạy server backend
-- `python seed.py`: nạp dữ liệu mẫu

@@ -151,8 +151,20 @@ export default function MarkAttendencePage({
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm">
-            <video ref={videoRef} playsInline muted className="video-mirror block h-[420px] w-full object-cover" />
-            <canvas ref={canvasRef} className="hidden-canvas" />
+            <div className="relative">
+              <video ref={videoRef} playsInline muted className="video-mirror block h-[420px] w-full object-cover" />
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-0 bg-slate-950/10" />
+                <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-3xl border-2 border-emerald-400/95 bg-emerald-500/10 shadow-[0_0_0_9999px_rgba(15,23,42,0.18)] sm:h-72 sm:w-72 md:h-80 md:w-80">
+                  <div className="absolute left-1/2 top-1/2 h-px w-20 -translate-x-1/2 -translate-y-1/2 bg-emerald-300/90" />
+                  <div className="absolute left-1/2 top-1/2 h-20 w-px -translate-x-1/2 -translate-y-1/2 bg-emerald-300/90" />
+                  <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white backdrop-blur-sm text-center">
+                    Đưa mặt vào khung này
+                  </div>
+                </div>
+              </div>
+            </div>
+            <canvas ref={canvasRef} className="hidden-canvas select-none" />
           </div>
 
           <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">

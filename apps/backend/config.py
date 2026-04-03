@@ -11,7 +11,7 @@ class Config:
     DATABASE_HOST = os.getenv('DATABASE_HOST', 'localhost')
     DATABASE_PORT = int(os.getenv('DATABASE_PORT', '3306'))
     DATABASE_USER = os.getenv('DATABASE_USER', 'root')
-    DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD', 'password')
+    DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD', '')
     DATABASE_NAME = os.getenv('DATABASE_NAME', 'class_student_attendance')
     
     # Build SQLAlchemy URI from components
@@ -40,7 +40,7 @@ class Config:
         'YOLO_MODEL_PATH',
         '../../../Model/Yolo/yolov10s.onnx'
     )
-    FACE_RECOGNITION_THRESHOLD = float(os.getenv('FACE_RECOGNITION_THRESHOLD', '0.04223'))
+    FACE_RECOGNITION_THRESHOLD = float(os.getenv('FACE_RECOGNITION_THRESHOLD', '0.68'))
     
     # File uploads
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')

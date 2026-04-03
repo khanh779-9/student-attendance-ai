@@ -89,8 +89,8 @@ def enroll_face():
             EmbeddingVector=json.dumps(embedding),
             ModelName='ArcFace',
             BackboneModel='ResNet100',
-            DetectorBackend='YOLO',
-            DistanceMetric='L2',
+            DetectorBackend='HaarCascade',
+            DistanceMetric='COSINE',
             IsPrimary=is_first_face,
             RegisteredByMSGV=registered_by_msgv
         )

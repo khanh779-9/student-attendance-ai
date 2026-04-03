@@ -50,35 +50,57 @@ class ArcFaceEmbedder:
 
 
 class FaceRecognitionService:
-    """Face recognition service using ArcFace cosine similarity."""
+    """Face recognition service using ArcFace cosine similarity scoring."""
 
     def __init__(self, arcface_model_path):
         self.embedder = ArcFaceEmbedder(arcface_model_path)
 
-    def recognize_face(self, image_path, enrolled_embeddings, threshold=0.04223):
+    def recognize_face(self, image_path, enrolled_embeddings, threshold=0.68):
         input_embedding = self.embedder.get_embedding(image_path)
         if input_embedding is None or not enrolled_embeddings:
             return None
 
-        best_data = None
-        best_similarity = -1.0
-        for enrolled_data in enrolled_embeddings:
-            enrolled_embedding = np.asarray(enrolled_data["embedding"], dtype=np.float32)
-            cosine_sim = float(np.dot(input_embedding, enrolled_embedding))
-            if cosine_sim > best_similarity:
-                best_similarity = cosine_sim
-                best_data = enrolled_data
+        threshold = float(threshold)
 
-        if best_data is None:
+        valid_data = []
+        valid_vectors = []
+        for enrolled_data in enrolled_embeddings:
+            enrolled_embedding = np.asarray(enrolled_data["embedding"], dtype=np.float32).reshape(-1)
+            if enrolled_embedding.size != input_embedding.size:
+                continue
+            # Normalize enrolled vectors as a safety step for older records.
+            enrolled_norm = np.linalg.norm(enrolled_embedding)
+            if enrolled_norm <= 0:
+                continue
+            valid_vectors.append(enrolled_embedding / enrolled_norm)
+            valid_data.append(enrolled_data)
+
+        if not valid_vectors:
             return None
 
-        confidence = round(best_similarity, 4)
-        return {
+        # Vectorized cosine scoring for faster matching across many enrollments.
+        enrolled_matrix = np.vstack(valid_vectors)
+        similarities = enrolled_matrix @ input_embedding
+        best_idx = int(np.argmax(similarities))
+        best_similarity = float(similarities[best_idx])
+        best_data = valid_data[best_idx]
+
+        distance_value = max(0.0, 1.0 - best_similarity)
+        accepted = best_similarity >= threshold
+        similarity_score = round(best_similarity, 4)
+        distance_score = round(distance_value, 4)
+
+        result = {
             "face_data": best_data,
-            "cosine_similarity": confidence,
-            "accepted": confidence > (1 - threshold),
-            "confidence": confidence,
+            "similarity": similarity_score,
+            "cosine_similarity": similarity_score,
+            "confidence": similarity_score,
+            "distance": distance_score,
+            "threshold": round(threshold, 4),
+            "accepted": accepted,
         }
+
+        return result
 
     def extract_embedding(self, image_path):
         embedding = self.embedder.get_embedding(image_path)

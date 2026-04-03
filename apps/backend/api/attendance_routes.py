@@ -23,6 +23,7 @@ def checkin_face():
         
         buoi_hoc_id = request.form.get('buoi_hoc_id', type=int)
         threshold = float(request.form.get('threshold', current_app.config['FACE_RECOGNITION_THRESHOLD']))
+        threshold_value = round(threshold, 4)
         file = request.files.get('file')
         
         if not buoi_hoc_id or not file:
@@ -56,15 +57,25 @@ def checkin_face():
             logger.info("No face detected in check-in image")
             return jsonify({
                 'accepted': False,
+                'mssv': None,
+                'student_name': None,
+                'attendance_status': None,
                 'message': 'Không phát hiện khuôn mặt trong ảnh.',
-                'confidence_score': 0.0
+                'confidence_score': 0.0,
+                'distance_score': None,
+                'threshold': threshold_value,
             }), 400
         if face_count and face_count > 1:
             logger.info("Multiple faces detected in check-in image: %s", face_count)
             return jsonify({
                 'accepted': False,
+                'mssv': None,
+                'student_name': None,
+                'attendance_status': None,
                 'message': 'Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.',
-                'confidence_score': 0.0
+                'confidence_score': 0.0,
+                'distance_score': None,
+                'threshold': threshold_value,
             }), 400
 
         class_students = SinhVien.query.filter_by(Lop=session.MaLop).all()
@@ -91,29 +102,51 @@ def checkin_face():
             logger.warning("No enrolled faces found for class")
             return jsonify({
                 'accepted': False,
-                'message': 'Chưa có sinh viên đăng kí khuôn mặt'
+                'mssv': None,
+                'student_name': None,
+                'attendance_status': None,
+                'message': 'Chưa có sinh viên đăng kí khuôn mặt',
+                'confidence_score': 0.0,
+                'distance_score': None,
+                'threshold': threshold_value,
             }), 400
 
         logger.info("Starting face recognition")
-        result = service.recognize_face(temp_filepath, enrolled_embeddings, threshold)
+        result = service.recognize_face(
+            temp_filepath,
+            enrolled_embeddings,
+            threshold=threshold,
+        )
         
         if result is None:
             logger.warning("No match found - face inconclusive")
             return jsonify({
                 'accepted': False,
+                'mssv': None,
+                'student_name': None,
+                'attendance_status': None,
                 'message': 'Khuôn mặt không xác định',
-                'confidence_score': 0.0
+                'confidence_score': 0.0,
+                'distance_score': None,
+                'threshold': threshold_value,
             }), 400
         
         confidence = float(result['confidence'])
+        distance = float(result['distance'])
+        threshold_value = round(float(result['threshold']), 4)
         accepted = bool(result['accepted'])
         
         if not accepted:
             logger.info("Recognition rejected: confidence %.4f < threshold %s", confidence, threshold)
             return jsonify({
                 'accepted': False,
+                'mssv': None,
+                'student_name': None,
+                'attendance_status': None,
                 'message': 'Khuôn mặt không xác định',
-                'confidence_score': round(confidence, 4)
+                'confidence_score': round(confidence, 4),
+                'distance_score': round(distance, 4),
+                'threshold': threshold_value,
             }), 400
 
         mssv = str(result['face_data']['mssv'])
@@ -135,7 +168,9 @@ def checkin_face():
                 'student_name': student_name,
                 'attendance_status': existing_checkin.AttendanceStatus,
                 'message': 'Sinh viên đã điểm danh rồi',
-                'confidence_score': round(confidence, 4)
+                'confidence_score': round(confidence, 4),
+                'distance_score': round(distance, 4),
+                'threshold': threshold_value,
             }), 200
 
         new_attendance = DiemDanh(
@@ -145,7 +180,7 @@ def checkin_face():
             CheckInTime=datetime.utcnow(),
             ConfidenceScore=confidence,
             MatchFaceDataID=face_data_id,
-            CheckInMethod='DEEPFACE'
+            CheckInMethod='ARCFACE'
         )
         db.session.add(new_attendance)
         db.session.commit()
@@ -158,7 +193,9 @@ def checkin_face():
             'student_name': student_name,
             'attendance_status': 'PRESENT',
             'message': 'Điểm danh thành công',
-            'confidence_score': round(confidence, 4)
+            'confidence_score': round(confidence, 4),
+            'distance_score': round(distance, 4),
+            'threshold': threshold_value,
         }), 200
     
     except Exception as e:
@@ -193,7 +230,7 @@ def get_session_stats(buoi_hoc_id):
             'late_count': sum(1 for a in attendance if a.AttendanceStatus == 'LATE'),
             'absent_count': sum(1 for a in attendance if a.AttendanceStatus == 'ABSENT'),
             'excused_count': sum(1 for a in attendance if a.AttendanceStatus == 'EXCUSED'),
-            'recognized_count': sum(1 for a in attendance if a.CheckInMethod == 'DEEPFACE')
+            'recognized_count': sum(1 for a in attendance if a.CheckInMethod in ('ARCFACE', 'DEEPFACE'))
         }
         
         return jsonify(stats), 200

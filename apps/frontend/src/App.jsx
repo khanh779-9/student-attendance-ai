@@ -82,7 +82,7 @@ function App() {
   const [showDiagnostic, setShowDiagnostic] = useState(false);
 
   const [buoiHocId, setBuoiHocId] = useState("1");
-  const [threshold, setThreshold] = useState("0.04223");
+  const [threshold, setThreshold] = useState("0.95");
   const [manualFile, setManualFile] = useState(null);
   const [manualMessage, setManualMessage] = useState("");
 
@@ -146,6 +146,7 @@ function App() {
       throw new Error("Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.");
     }
   }
+
 
   useEffect(() => {
     return () => {
