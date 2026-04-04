@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from models import SinhVienKhuonMat, SinhVien, db
+from models import SinhVienKhuonMat, SinhVien, Enrollment, db
 from auth import require_auth
 import os
 import json
@@ -39,18 +39,18 @@ def save_enrollment_file(file, mssv):
 def enroll_face():
     """Enroll face for a student using uploaded image (supports multiple images per student)"""
     try:
-        mssv = request.form.get('mssv')
+        mssv = request.form.get('student_id') or request.form.get('mssv')
         registered_by_msgv = request.form.get('registered_by_msgv', request.msgv)
         file = request.files.get('file')
 
         logger.info("Enrollment request: mssv=%s msgv=%s", mssv, request.msgv)
         
         if not mssv:
-            return jsonify({'error': 'Missing mssv in form data'}), 400
+            return jsonify({'error': 'Missing student_id in form data'}), 400
         if not file:
             return jsonify({'error': 'Missing file in request'}), 400
         
-        student = SinhVien.query.filter_by(MSSV=mssv).first()
+        student = SinhVien.query.filter_by(id=mssv).first()
         if not student:
             return jsonify({'error': f'Student {mssv} not found'}), 404
 
@@ -80,19 +80,13 @@ def enroll_face():
 
         logger.info("Embedding extracted for %s", mssv)
 
-        existing_faces = SinhVienKhuonMat.query.filter_by(MSSV=mssv, IsActive=True).all()
+        existing_faces = SinhVienKhuonMat.query.filter_by(student_id=mssv).all()
         is_first_face = len(existing_faces) == 0
 
         face_record = SinhVienKhuonMat(
-            MSSV=mssv,
-            ImagePath=filepath,
-            EmbeddingVector=json.dumps(embedding),
-            ModelName='ArcFace',
-            BackboneModel='ResNet100',
-            DetectorBackend='HaarCascade',
-            DistanceMetric='COSINE',
-            IsPrimary=is_first_face,
-            RegisteredByMSGV=registered_by_msgv
+            student_id=mssv,
+            image_path=filepath,
+            embedding=json.dumps(embedding)
         )
         
         db.session.add(face_record)
@@ -101,9 +95,9 @@ def enroll_face():
         logger.info("Khuôn mặt được đăng kí thành công. Tổng khuôn mặt cho %s: %s", mssv, len(existing_faces) + 1)
         
         return jsonify({
-            'face_data_id': face_record.FaceDataID,
-            'is_primary': is_first_face,
-            'total_faces': len(existing_faces) + 1,
+            'faceEmbeddingId': face_record.FaceDataID,
+            'isPrimary': is_first_face,
+            'totalFaces': len(existing_faces) + 1,
             'message': f'Khuôn mặt được đăng kí thành công. Tổng khuôn mặt: {len(existing_faces) + 1}' if not is_first_face else 'Khuôn mặt được đăng kí thành công (khuôn mặt chính)'
         }), 201
     
@@ -112,29 +106,26 @@ def enroll_face():
         logger.exception("Enrollment error: %s", str(e))
         return jsonify({'error': str(e)}), 500
 
-@face_bp.route('/list/<mssv>', methods=['GET'])
+@face_bp.route('/list/<student_id>', methods=['GET'])
 @require_auth
-def get_enrolled_faces(mssv):
+def get_enrolled_faces(student_id):
     """Get all enrolled faces for a student"""
     try:
-        student = SinhVien.query.filter_by(MSSV=mssv).first()
+        student = SinhVien.query.filter_by(id=student_id).first()
         if not student:
             return jsonify({'error': 'Student not found'}), 404
         
-        faces = SinhVienKhuonMat.query.filter_by(
-            MSSV=mssv,
-            IsActive=True
-        ).all()
+        faces = SinhVienKhuonMat.query.filter_by(student_id=student_id).all()
         
         result = []
         for face in faces:
             result.append({
-                'FaceDataID': face.FaceDataID,
-                'MSSV': face.MSSV,
-                'ImagePath': face.ImagePath,
-                'ModelName': face.ModelName,
-                'IsPrimary': face.IsPrimary,
-                'RegisteredAt': face.RegisteredAt.isoformat() if face.RegisteredAt else None
+                'id': face.FaceDataID,
+                'studentId': face.MSSV,
+                'imagePath': face.ImagePath,
+                'modelName': face.ModelName,
+                'isPrimary': face.IsPrimary,
+                'registeredAt': face.RegisteredAt.isoformat() if face.RegisteredAt else None
             })
         
         return jsonify(result), 200
@@ -142,45 +133,50 @@ def get_enrolled_faces(mssv):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@face_bp.route('/class-diagnostic/<ma_lop>', methods=['GET'])
+@face_bp.route('/class-diagnostic/<class_id>', methods=['GET'])
 @require_auth
-def class_face_diagnostic(ma_lop):
+def class_face_diagnostic(class_id):
     """Get face enrollment status for all students in a class"""
     try:
-        logger.info("Checking face status for class %s", ma_lop)
+        logger.info("Checking face status for class %s", class_id)
         
-        lop = Lop.query.filter_by(MaLop=ma_lop).first()
+        lop = Lop.query.filter_by(id=class_id).first()
         if not lop:
-            return jsonify({'error': f'Class {ma_lop} not found'}), 404
+            return jsonify({'error': f'Class {class_id} not found'}), 404
         
-        students = SinhVien.query.filter_by(Lop=ma_lop).all()
+        students = (
+            db.session.query(SinhVien)
+            .join(Enrollment, Enrollment.student_id == SinhVien.id)
+            .filter(Enrollment.class_id == class_id)
+            .all()
+        )
         
         result = {
-            'ma_lop': ma_lop,
-            'total_students': len(students),
-            'students_with_faces': 0,
-            'students_without_faces': 0,
+            'classId': class_id,
+            'totalStudents': len(students),
+            'studentsWithFaces': 0,
+            'studentsWithoutFaces': 0,
             'students': []
         }
         
         for student in students:
-            face_count = db.session.query(func.count(SinhVienKhuonMat.FaceDataID)).filter_by(
-                MSSV=student.MSSV, IsActive=True
+            face_count = db.session.query(func.count(SinhVienKhuonMat.id)).filter_by(
+                student_id=student.MSSV
             ).scalar()
             
             student_info = {
-                'mssv': student.MSSV,
-                'ho_ten_sv': student.Ho_Ten_SV,
-                'face_count': int(face_count or 0),
+                'studentId': student.MSSV,
+                'studentName': student.Ho_Ten_SV,
+                'faceCount': int(face_count or 0),
                 'status': 'CÓ_KHUÔN_MẶT' if face_count and face_count > 0 else 'KHÔNG_CÓ_KHUÔN_MẶT'
             }
             
             result['students'].append(student_info)
             
             if face_count and face_count > 0:
-                result['students_with_faces'] += 1
+                result['studentsWithFaces'] += 1
             else:
-                result['students_without_faces'] += 1
+                result['studentsWithoutFaces'] += 1
         
         return jsonify(result), 200
     

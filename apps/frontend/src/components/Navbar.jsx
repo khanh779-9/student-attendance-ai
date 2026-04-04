@@ -14,15 +14,21 @@ export default function Navbar({ lecturer, onLogout }) {
   return (
     <aside className="w-full md:w-64 bg-white border-b md:border-b-0 border-r border-slate-200 shadow-lg md:shadow-[4px_0_24px_rgba(0,0,0,0.05)] z-10 flex flex-col h-auto md:h-screen sticky top-0 p-4 lg:p-5">
       <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Hệ Thống Nhận Diện</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          Hệ Thống Nhận Diện
+        </p>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
           <span>Điểm Danh</span>
         </h1>
       </div>
 
       <div className="mt-6 mb-4 xl:mt-8 grid gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-4 relative overflow-hidden">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Giáo Viên</span>
-        <strong className="text-base font-semibold text-slate-900 truncate">{lecturer || "Khách"}</strong>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+          Giáo Viên
+        </span>
+        <strong className="text-base font-semibold text-slate-900 truncate">
+          {lecturer || "Khách"}
+        </strong>
       </div>
 
       <nav className="flex-1 grid gap-2 content-start overflow-y-auto">

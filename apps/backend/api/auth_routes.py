@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import GiangVien
-from auth import verify_password, generate_token
+from auth import generate_token
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -16,9 +16,9 @@ def login():
         msgv = data['msgv']
         password = data['password']
 
-        lecturer = GiangVien.query.filter_by(MSGV=msgv).first()
+        lecturer = GiangVien.query.filter_by(id=msgv).first()
         
-        if not lecturer or not verify_password(password, lecturer.Password):
+        if not lecturer or lecturer.Password != password:
             return jsonify({'error': 'Invalid credentials'}), 401
         
         if not lecturer.IsActive:
@@ -27,9 +27,9 @@ def login():
         token = generate_token(msgv)
         
         return jsonify({
-            'access_token': token,
-            'ho_ten': lecturer.HoTen,
-            'msgv': lecturer.MSGV
+            'accessToken': token,
+            'teacherName': lecturer.HoTen,
+            'teacherId': lecturer.MSGV
         }), 200
     
     except Exception as e:

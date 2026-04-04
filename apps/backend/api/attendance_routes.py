@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from models import DiemDanh, BuoiHoc, SinhVien, SinhVienKhuonMat, db
+from models import DiemDanh, BuoiHoc, SinhVien, SinhVienKhuonMat, Enrollment, db
 from auth import require_auth
 from datetime import datetime
 import os
@@ -14,17 +14,17 @@ attendance_bp = Blueprint('attendance', __name__, url_prefix='/api/attendance')
 logger = logging.getLogger(__name__)
 
 
-def _build_checkin_response(accepted, mssv=None, student_name=None, attendance_status=None,
+def _build_checkin_response(accepted, student_id=None, student_name=None, attendance_status=None,
                             message="", confidence=0.0, distance=None, threshold=0.0):
     """Build standardized check-in response payload."""
     return {
         'accepted': accepted,
-        'mssv': mssv,
-        'student_name': student_name,
-        'attendance_status': attendance_status,
+        'studentId': student_id,
+        'studentName': student_name,
+        'attendanceStatus': attendance_status,
         'message': message,
-        'confidence_score': round(confidence, 4) if confidence else 0.0,
-        'distance_score': round(distance, 4) if distance is not None else None,
+        'confidenceScore': round(confidence, 4) if confidence else 0.0,
+        'distanceScore': round(distance, 4) if distance is not None else None,
         'threshold': round(threshold, 4),
     }
 
@@ -36,18 +36,18 @@ def checkin_face():
     try:
         logger.info("Attendance check-in request")
         
-        buoi_hoc_id = request.form.get('buoi_hoc_id', type=int)
+        session_id = request.form.get('session_id', type=int) or request.form.get('buoi_hoc_id', type=int)
         threshold = float(request.form.get('threshold', current_app.config['FACE_RECOGNITION_THRESHOLD']))
         threshold_value = round(threshold, 4)
         file = request.files.get('file')
         
-        if not buoi_hoc_id or not file:
-            logger.warning("Missing buoi_hoc_id or file")
-            return jsonify({'error': 'Missing buoi_hoc_id or file'}), 400
+        if not session_id or not file:
+            logger.warning("Missing session_id or file")
+            return jsonify({'error': 'Missing session_id or file'}), 400
 
-        session = BuoiHoc.query.filter_by(BuoiHocID=buoi_hoc_id).first()
+        session = BuoiHoc.query.filter_by(id=session_id).first()
         if not session:
-            logger.warning("Session %s not found", buoi_hoc_id)
+            logger.warning("Session %s not found", session_id)
             return jsonify({'error': 'Session not found'}), 404
         
         if session.Status != 'OPEN':
@@ -83,12 +83,17 @@ def checkin_face():
                 threshold=threshold_value,
             )), 400
 
-        class_students = SinhVien.query.filter_by(Lop=session.MaLop).all()
+        class_students = (
+            db.session.query(SinhVien)
+            .join(Enrollment, Enrollment.student_id == SinhVien.id)
+            .filter(Enrollment.class_id == session.MaLop)
+            .all()
+        )
         logger.info("Found %s students in class %s", len(class_students), session.MaLop)
         
         enrolled_embeddings = []
         for student in class_students:
-            faces = SinhVienKhuonMat.query.filter_by(MSSV=student.MSSV, IsActive=True).all()
+            faces = SinhVienKhuonMat.query.filter_by(student_id=student.MSSV).all()
             
             for face in faces:
                 try:
@@ -148,15 +153,15 @@ def checkin_face():
         logger.info("Recognition accepted: MSSV=%s Name=%s Confidence=%.4f", mssv, student_name, confidence)
 
         existing_checkin = DiemDanh.query.filter_by(
-            BuoiHocID=buoi_hoc_id,
-            MSSV=mssv
+            session_id=session_id,
+            student_id=mssv
         ).first()
         
         if existing_checkin:
             logger.info("Student %s already checked in", mssv)
             return jsonify(_build_checkin_response(
                 accepted=True,
-                mssv=mssv,
+                student_id=mssv,
                 student_name=student_name,
                 attendance_status=existing_checkin.AttendanceStatus,
                 message='Sinh viên đã điểm danh rồi',
@@ -166,13 +171,10 @@ def checkin_face():
             )), 200
 
         new_attendance = DiemDanh(
-            BuoiHocID=buoi_hoc_id,
-            MSSV=mssv,
-            AttendanceStatus='PRESENT',
-            CheckInTime=datetime.utcnow(),
-            ConfidenceScore=confidence,
-            MatchFaceDataID=face_data_id,
-            CheckInMethod='ARCFACE'
+            session_id=session_id,
+            student_id=mssv,
+            status='present',
+            checkin_time=datetime.utcnow()
         )
         db.session.add(new_attendance)
         db.session.commit()
@@ -181,7 +183,7 @@ def checkin_face():
         
         return jsonify(_build_checkin_response(
             accepted=True,
-            mssv=mssv,
+            student_id=mssv,
             student_name=student_name,
             attendance_status='PRESENT',
             message='Điểm danh thành công',
@@ -203,26 +205,31 @@ def checkin_face():
             except Exception as e:
                 logger.warning("Failed to cleanup temp file: %s", str(e))
 
-@attendance_bp.route('/session/<int:buoi_hoc_id>/stats', methods=['GET'])
+@attendance_bp.route('/session/<int:session_id>/stats', methods=['GET'])
 @require_auth
-def get_session_stats(buoi_hoc_id):
+def get_session_stats(session_id):
     """Get attendance statistics for a session"""
     try:
-        session = BuoiHoc.query.filter_by(BuoiHocID=buoi_hoc_id).first()
+        session = BuoiHoc.query.filter_by(id=session_id).first()
         if not session:
             return jsonify({'error': 'Session not found'}), 404
 
-        class_students = SinhVien.query.filter_by(Lop=session.MaLop).count()
+        class_students = (
+            db.session.query(SinhVien.id)
+            .join(Enrollment, Enrollment.student_id == SinhVien.id)
+            .filter(Enrollment.class_id == session.MaLop)
+            .count()
+        )
 
-        attendance = DiemDanh.query.filter_by(BuoiHocID=buoi_hoc_id).all()
+        attendance = DiemDanh.query.filter_by(session_id=session_id).all()
 
         stats = {
-            'total_students': class_students,
-            'present_count': sum(1 for a in attendance if a.AttendanceStatus == 'PRESENT'),
-            'late_count': sum(1 for a in attendance if a.AttendanceStatus == 'LATE'),
-            'absent_count': sum(1 for a in attendance if a.AttendanceStatus == 'ABSENT'),
-            'excused_count': sum(1 for a in attendance if a.AttendanceStatus == 'EXCUSED'),
-            'recognized_count': sum(1 for a in attendance if a.CheckInMethod in ('ARCFACE', 'DEEPFACE'))
+            'totalStudents': class_students,
+            'presentCount': sum(1 for a in attendance if a.AttendanceStatus == 'PRESENT'),
+            'lateCount': sum(1 for a in attendance if a.AttendanceStatus == 'LATE'),
+            'absentCount': sum(1 for a in attendance if a.AttendanceStatus == 'ABSENT'),
+            'excusedCount': sum(1 for a in attendance if a.AttendanceStatus == 'EXCUSED'),
+            'recognizedCount': sum(1 for a in attendance if a.CheckInMethod in ('ARCFACE', 'DEEPFACE'))
         }
         
         return jsonify(stats), 200
@@ -230,31 +237,31 @@ def get_session_stats(buoi_hoc_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@attendance_bp.route('/session/<int:buoi_hoc_id>/history', methods=['GET'])
+@attendance_bp.route('/session/<int:session_id>/history', methods=['GET'])
 @require_auth
-def get_attendance_history(buoi_hoc_id):
+def get_attendance_history(session_id):
     """Get attendance history for a session"""
     try:
-        logger.info("Loading attendance history for session %s", buoi_hoc_id)
+        logger.info("Loading attendance history for session %s", session_id)
         
-        session = BuoiHoc.query.filter_by(BuoiHocID=buoi_hoc_id).first()
+        session = BuoiHoc.query.filter_by(id=session_id).first()
         if not session:
-            logger.warning("Session %s not found", buoi_hoc_id)
+            logger.warning("Session %s not found", session_id)
             return jsonify({'error': 'Session not found'}), 404
         
-        attendance_records = DiemDanh.query.filter_by(BuoiHocID=buoi_hoc_id).all()
+        attendance_records = DiemDanh.query.filter_by(session_id=session_id).all()
         logger.info("Found %s attendance records", len(attendance_records))
         
         result = []
         for record in attendance_records:
             student = record.student
             result.append({
-                'mssv': str(record.MSSV),
-                'ho_ten_sv': str(student.Ho_Ten_SV) if student else 'Không xác định',
-                'attendance_status': str(record.AttendanceStatus),
-                'check_in_time': record.CheckInTime.isoformat() if record.CheckInTime else None,
-                'confidence_score': float(record.ConfidenceScore) if record.ConfidenceScore else None,
-                'check_in_method': str(record.CheckInMethod)
+                'studentId': str(record.MSSV),
+                'studentName': str(student.Ho_Ten_SV) if student else 'Không xác định',
+                'attendanceStatus': str(record.AttendanceStatus),
+                'checkinTime': record.CheckInTime.isoformat() if record.CheckInTime else None,
+                'confidenceScore': None,
+                'checkinMethod': str(record.CheckInMethod)
             })
         
         return jsonify(result), 200
@@ -263,16 +270,16 @@ def get_attendance_history(buoi_hoc_id):
         logger.exception("Error loading attendance history: %s", str(e))
         return jsonify({'error': str(e)}), 500
 
-@attendance_bp.route('/session/<int:buoi_hoc_id>/history.csv', methods=['GET'])
+@attendance_bp.route('/session/<int:session_id>/history.csv', methods=['GET'])
 @require_auth
-def export_attendance_csv(buoi_hoc_id):
+def export_attendance_csv(session_id):
     """Export attendance history as CSV"""
     try:
-        session = BuoiHoc.query.filter_by(BuoiHocID=buoi_hoc_id).first()
+        session = BuoiHoc.query.filter_by(id=session_id).first()
         if not session:
             return jsonify({'error': 'Session not found'}), 404
         
-        attendance_records = DiemDanh.query.filter_by(BuoiHocID=buoi_hoc_id).all()
+        attendance_records = DiemDanh.query.filter_by(session_id=session_id).all()
 
         output = StringIO()
         writer = csv.writer(output)
@@ -285,12 +292,12 @@ def export_attendance_csv(buoi_hoc_id):
                 student.Ho_Ten_SV,
                 record.AttendanceStatus,
                 record.CheckInTime.isoformat() if record.CheckInTime else '',
-                f"{record.ConfidenceScore:.4f}" if record.ConfidenceScore else '',
+                '',
                 record.CheckInMethod
             ])
 
         response = make_response(output.getvalue())
-        response.headers['Content-Disposition'] = f'attachment; filename=attendance_{buoi_hoc_id}.csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=attendance_{session_id}.csv'
         response.headers['Content-Type'] = 'text/csv'
         return response
     

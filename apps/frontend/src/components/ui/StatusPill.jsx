@@ -9,7 +9,13 @@ const STATUS_CLASSES = {
 export default function StatusPill({ value, className = "" }) {
   const tone = STATUS_CLASSES[value] || STATUS_CLASSES.neutral;
   return (
-    <span className={["inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", tone, className].join(" ")}>
+    <span
+      className={[
+        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+        tone,
+        className,
+      ].join(" ")}
+    >
       {value || "-"}
     </span>
   );

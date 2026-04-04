@@ -1,10 +1,13 @@
 import Button from "../components/ui/Button";
 import StatusPill from "../components/ui/StatusPill";
 import TableShell from "../components/ui/TableShell";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 export default function MarkAttendencePage({
   isLoggedIn,
   buoiHocId,
+  setBuoiHocId,
   startRealtime,
   stopRealtime,
   streaming,
@@ -23,6 +26,15 @@ export default function MarkAttendencePage({
   loadAttendanceRecords,
   historyRows,
 }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    const state = location.state || {};
+    if (state.sessionId) {
+      setBuoiHocId(String(state.sessionId));
+      loadAttendanceStats();
+    }
+  }, [location.state, setBuoiHocId, loadAttendanceStats]);
   function getResultTone(message) {
     const msg = String(message || "").toLowerCase();
     if (!msg.trim()) return "neutral";
@@ -56,17 +68,30 @@ export default function MarkAttendencePage({
     neutral: "border-slate-200 bg-slate-50 text-slate-700",
   };
 
+  const formatCheckinTime = (value) => {
+    if (!value) return "-";
+    const raw = String(value);
+    const hasZone = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw);
+    const iso = hasZone ? raw : `${raw}Z`;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleTimeString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   return (
     <section className="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Điểm danh</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+            Điểm danh
+          </h2>
         </div>
-        <Button
-          onClick={loadAttendanceStats}
-          disabled={!isLoggedIn}
-          size="lg"
-        >
+        <Button onClick={loadAttendanceStats} disabled={!isLoggedIn} size="lg">
           Tải thống kê
         </Button>
       </div>
@@ -88,10 +113,7 @@ export default function MarkAttendencePage({
 
           <div className="grid gap-2">
             {!streaming ? (
-              <Button
-                onClick={startRealtime}
-                disabled={!isLoggedIn}
-              >
+              <Button onClick={startRealtime} disabled={!isLoggedIn}>
                 Bắt đầu camera
               </Button>
             ) : (
@@ -111,48 +133,79 @@ export default function MarkAttendencePage({
 
           <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             Danh tính gần nhất:
-            <strong className="mt-1 block text-slate-900">{lastIdentity || "—"}</strong>
+            <strong className="mt-1 block text-slate-900">
+              {lastIdentity || "—"}
+            </strong>
             {lastDistance !== null && (
-              <span className="block text-xs text-slate-500">Score: {Number(lastDistance).toFixed(4)}</span>
+              <span className="block text-xs text-slate-500">
+                Score: {Number(lastDistance).toFixed(4)}
+              </span>
             )}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 mb-2 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-              <small className="text-sm font-medium text-slate-500">Tổng SV</small>
-              <strong className="mt-1 block text-3xl font-bold text-slate-900">{stats?.total_students ?? 0}</strong>
+              <small className="text-sm font-medium text-slate-500">
+                Tổng SV
+              </small>
+              <strong className="mt-1 block text-3xl font-bold text-slate-900">
+                {stats?.totalStudents ?? 0}
+              </strong>
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-              <small className="text-sm font-medium text-emerald-700">Có mặt</small>
-              <strong className="mt-1 block text-3xl font-bold text-emerald-800">{stats?.present_count ?? 0}</strong>
+              <small className="text-sm font-medium text-emerald-700">
+                Có mặt
+              </small>
+              <strong className="mt-1 block text-3xl font-bold text-emerald-800">
+                {stats?.presentCount ?? 0}
+              </strong>
             </div>
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
               <small className="text-sm font-medium text-amber-700">Muộn</small>
-              <strong className="mt-1 block text-3xl font-bold text-amber-800">{stats?.late_count ?? 0}</strong>
+              <strong className="mt-1 block text-3xl font-bold text-amber-800">
+                {stats?.lateCount ?? 0}
+              </strong>
             </div>
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
               <small className="text-sm font-medium text-rose-700">Vắng</small>
-              <strong className="mt-1 block text-3xl font-bold text-rose-800">{stats?.absent_count ?? 0}</strong>
+              <strong className="mt-1 block text-3xl font-bold text-rose-800">
+                {stats?.absentCount ?? 0}
+              </strong>
             </div>
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-              <small className="text-sm font-medium text-indigo-700">Được phép</small>
-              <strong className="mt-1 block text-3xl font-bold text-indigo-800">{stats?.excused_count ?? 0}</strong>
+              <small className="text-sm font-medium text-indigo-700">
+                Được phép
+              </small>
+              <strong className="mt-1 block text-3xl font-bold text-indigo-800">
+                {stats?.excusedCount ?? 0}
+              </strong>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-              <small className="text-sm font-medium text-blue-700">Nhận diện OK</small>
-              <strong className="mt-1 block text-3xl font-bold text-blue-800">{stats?.recognized_count ?? 0}</strong>
+              <small className="text-sm font-medium text-blue-700">
+                Nhận diện OK
+              </small>
+              <strong className="mt-1 block text-3xl font-bold text-blue-800">
+                {stats?.recognizedCount ?? 0}
+              </strong>
             </div>
           </div>
         </div>
 
         <div className="grid gap-4">
-          <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${resultToneClass[rtTone]}`}>
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm font-semibold ${resultToneClass[rtTone]}`}
+          >
             {rtMessage || "Chưa có kết quả realtime."}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm">
             <div className="relative">
-              <video ref={videoRef} playsInline muted className="video-mirror block h-[420px] w-full object-cover" />
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="video-mirror block h-[420px] w-full object-cover"
+              />
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute inset-0 bg-slate-950/10" />
                 <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-3xl border-2 border-emerald-400/95 bg-emerald-500/10 shadow-[0_0_0_9999px_rgba(15,23,42,0.18)] sm:h-72 sm:w-72 md:h-80 md:w-80">
@@ -167,8 +220,10 @@ export default function MarkAttendencePage({
             <canvas ref={canvasRef} className="hidden-canvas select-none" />
           </div>
 
-          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-base font-semibold text-slate-800">Check-in bằng ảnh</h3>
+          {/* <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h3 className="text-base font-semibold text-slate-800">
+              Check-in bằng ảnh
+            </h3>
             <form
               className="grid gap-3 [&_label]:grid [&_label]:gap-2 [&_label]:text-sm [&_label]:font-medium [&_input]:rounded-lg [&_input]:border [&_input]:border-slate-300 [&_input]:bg-white [&_input]:px-3 [&_input]:py-2"
               onSubmit={handleManualCheckin}
@@ -188,10 +243,13 @@ export default function MarkAttendencePage({
             <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
               Lưu ý: Ảnh chỉ nên có 1 khuôn mặt rõ ràng.
             </p>
-            <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${resultToneClass[manualTone]}`}>
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold ${resultToneClass[manualTone]}`}
+            >
               {manualMessage || "Chưa có kết quả check-in."}
             </div>
-          </div>
+          </div> */}
+          
         </div>
       </div>
 
@@ -199,7 +257,9 @@ export default function MarkAttendencePage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-slate-800">Danh sách điểm danh</h3>
+          <h3 className="text-base font-semibold text-slate-800">
+            Danh sách điểm danh
+          </h3>
         </div>
         <Button
           type="button"
@@ -225,27 +285,31 @@ export default function MarkAttendencePage({
           <tbody>
             {historyRows && historyRows.length > 0 ? (
               historyRows.map((row, idx) => (
-                <tr key={idx} className="border-t border-slate-200 text-sm text-slate-700">
-                  <td className="px-3 py-3">{row.mssv}</td>
-                  <td className="px-3 py-3">{row.ho_ten_sv}</td>
+                <tr
+                  key={idx}
+                  className="border-t border-slate-200 text-sm text-slate-700"
+                >
+                  <td className="px-3 py-3">{row.studentId}</td>
+                  <td className="px-3 py-3">{row.studentName}</td>
                   <td className="px-3 py-3">
-                    <StatusPill value={row.attendance_status} />
+                    <StatusPill value={row.attendanceStatus} />
                   </td>
                   <td className="px-3 py-3">
-                    {row.check_in_time
-                      ? new Date(row.check_in_time).toLocaleTimeString("vi-VN")
-                      : "-"}
+                    {formatCheckinTime(row.checkinTime)}
                   </td>
                   <td className="px-3 py-3">
-                    {row.confidence_score
-                      ? Number(row.confidence_score).toFixed(4)
+                    {row.confidenceScore
+                      ? Number(row.confidenceScore).toFixed(4)
                       : "-"}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="px-3 py-6 text-center text-sm text-slate-500">
+                <td
+                  colSpan="5"
+                  className="px-3 py-6 text-center text-sm text-slate-500"
+                >
                   Chưa có dữ liệu
                 </td>
               </tr>

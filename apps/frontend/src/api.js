@@ -1,29 +1,34 @@
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const RAW_API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const API_BASE = RAW_API_BASE.replace(/\/$/, "");
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.detail || data.message || data.error || "Request failed");
+    throw new Error(
+      data.detail || data.message || data.error || "Request failed",
+    );
   }
   return data;
 }
 
 export async function login(msgv, password) {
-  return request("/api/auth/login", {
+  const data = await request("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ msgv, password }),
   });
+  return {
+    accessToken: data.accessToken,
+    teacherName: data.teacherName,
+    teacherId: data.teacherId,
+  };
 }
 
-export async function enrollFaceFile({ token, mssv, registeredByMsgv, file }) {
+export async function enrollFaceFile({ token, studentId, file }) {
   const form = new FormData();
-  form.append("mssv", mssv);
-  if (registeredByMsgv) {
-    form.append("registered_by_msgv", registeredByMsgv);
-  }
+  form.append("student_id", studentId);
   form.append("file", file);
 
   return request("/api/face/enroll-file", {
@@ -35,7 +40,7 @@ export async function enrollFaceFile({ token, mssv, registeredByMsgv, file }) {
 
 export async function checkinFaceFile({ token, buoiHocId, file, threshold }) {
   const form = new FormData();
-  form.append("buoi_hoc_id", String(buoiHocId));
+  form.append("session_id", String(buoiHocId));
   if (threshold !== "") {
     form.append("threshold", String(threshold));
   }
@@ -62,16 +67,14 @@ export async function createClass({ token, maLop, tenLop, nienKhoa, hocKy }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ma_lop: maLop,
-      ten_lop: tenLop,
-      nien_khoa: nienKhoa || null,
-      hoc_ky: hocKy || null,
+      id: maLop,
+      name: tenLop,
     }),
   });
 }
 
 export async function listStudents(token, maLop = "") {
-  const q = maLop ? `?ma_lop=${encodeURIComponent(maLop)}` : "";
+  const q = maLop ? `?class_id=${encodeURIComponent(maLop)}` : "";
   return request(`/api/students${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -85,9 +88,9 @@ export async function createStudent({ token, mssv, hoTenSv, lop }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      mssv,
-      ho_ten_sv: hoTenSv,
-      lop,
+      id: mssv,
+      name: hoTenSv,
+      classId: lop,
     }),
   });
 }
@@ -100,9 +103,7 @@ export async function updateClass({ token, maLop, tenLop, nienKhoa, hocKy }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ten_lop: tenLop,
-      nien_khoa: nienKhoa || null,
-      hoc_ky: hocKy || null,
+      name: tenLop,
     }),
   });
 }
@@ -115,26 +116,34 @@ export async function updateStudent({ token, mssv, hoTenSv, lop }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ho_ten_sv: hoTenSv,
-      lop,
+      name: hoTenSv,
+      classId: lop,
     }),
   });
 }
 
 export async function getAttendanceSessionStats({ token, buoiHocId }) {
-  return request(`/api/attendance/session/${encodeURIComponent(buoiHocId)}/stats`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return request(
+    `/api/attendance/session/${encodeURIComponent(buoiHocId)}/stats`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export async function listSessions(token, maLop = "") {
-  const q = maLop ? `?ma_lop=${encodeURIComponent(maLop)}` : "";
+  const q = maLop ? `?class_id=${encodeURIComponent(maLop)}` : "";
   return request(`/api/sessions${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
-export async function createSession({ token, maLop, tieuDe, scheduledStart, scheduledEnd }) {
+export async function createSession({
+  token,
+  maLop,
+  scheduledStart,
+  scheduledEnd,
+}) {
   return request("/api/sessions", {
     method: "POST",
     headers: {
@@ -142,10 +151,9 @@ export async function createSession({ token, maLop, tieuDe, scheduledStart, sche
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ma_lop: maLop,
-      tieu_de: tieuDe || null,
-      scheduled_start: scheduledStart || null,
-      scheduled_end: scheduledEnd || null,
+      classId: maLop,
+      scheduledStart: scheduledStart || null,
+      scheduledEnd: scheduledEnd || null,
     }),
   });
 }
@@ -165,9 +173,12 @@ export async function endSession({ token, buoiHocId }) {
 }
 
 export async function getAttendanceSessionHistory({ token, buoiHocId }) {
-  return request(`/api/attendance/session/${encodeURIComponent(buoiHocId)}/history`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return request(
+    `/api/attendance/session/${encodeURIComponent(buoiHocId)}/history`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export function getAttendanceSessionHistoryCsvUrl(buoiHocId) {

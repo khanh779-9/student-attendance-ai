@@ -1,6 +1,14 @@
 import Navbar from "../components/Navbar";
 
-export default function DashboardLayout({ lecturer, onLogout, title, subtitle, children, actionLabel, onAction }) {
+export default function DashboardLayout({
+  lecturer,
+  onLogout,
+  title,
+  subtitle,
+  children,
+  actionLabel,
+  onAction,
+}) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       <Navbar lecturer={lecturer} onLogout={onLogout} />

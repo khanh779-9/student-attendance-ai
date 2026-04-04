@@ -55,6 +55,15 @@ class FaceRecognitionService:
     def __init__(self, arcface_model_path):
         self.embedder = ArcFaceEmbedder(arcface_model_path)
 
+    @staticmethod
+    def _cosine_similarity(vec1, vec2):
+        """Compute cosine similarity with safe normalization."""
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+        if norm1 == 0 or norm2 == 0:
+            return None
+        return float(np.dot(vec1 / norm1, vec2 / norm2))
+
     def recognize_face(self, image_path, enrolled_embeddings, threshold=0.04223):
         input_embedding = self.embedder.get_embedding(image_path)
         if input_embedding is None or not enrolled_embeddings:
@@ -64,7 +73,12 @@ class FaceRecognitionService:
         best_similarity = -1.0
         for enrolled_data in enrolled_embeddings:
             enrolled_embedding = np.asarray(enrolled_data["embedding"], dtype=np.float32)
-            cosine_sim = float(np.dot(input_embedding, enrolled_embedding))
+            if enrolled_embedding.shape != input_embedding.shape:
+                # Skip malformed or legacy embeddings to avoid shape mismatch errors.
+                continue
+            cosine_sim = self._cosine_similarity(input_embedding, enrolled_embedding)
+            if cosine_sim is None:
+                continue
             if cosine_sim > best_similarity:
                 best_similarity = cosine_sim
                 best_data = enrolled_data
@@ -75,10 +89,13 @@ class FaceRecognitionService:
         confidence = round(best_similarity, 4)
         distance = round(1 - confidence, 4)
         threshold = round(threshold, 4)
+        
+        print(f"Best match with cosine similarity (confidence): {confidence}, distance: {distance}, threshold: {threshold}")
+
         return {
             "face_data": best_data,
             "cosine_similarity": confidence,
-            "accepted": confidence > (1 - threshold),
+            "accepted": confidence > threshold,
             "confidence": confidence,
             "distance": distance,
             "threshold": threshold

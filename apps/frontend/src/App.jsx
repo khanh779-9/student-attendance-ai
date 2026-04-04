@@ -40,7 +40,9 @@ const TABS = [
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [lecturer, setLecturer] = useState(localStorage.getItem("lecturer") || "");
+  const [lecturer, setLecturer] = useState(
+    localStorage.getItem("lecturer") || "",
+  );
   const [activeTab, setActiveTab] = useState("attendance");
   const [msgv, setMsgv] = useState("GV001");
   const [password, setPassword] = useState("");
@@ -70,7 +72,6 @@ function App() {
   const [sessionRows, setSessionRows] = useState([]);
   const [sessionMessage, setSessionMessage] = useState("");
   const [sessionMaLop, setSessionMaLop] = useState("");
-  const [sessionTieuDe, setSessionTieuDe] = useState("");
   const [sessionStart, setSessionStart] = useState("");
   const [sessionEnd, setSessionEnd] = useState("");
   const [sessionFilterLop, setSessionFilterLop] = useState("");
@@ -143,10 +144,11 @@ function App() {
       throw new Error("Không phát hiện khuôn mặt trong ảnh.");
     }
     if (count > 1) {
-      throw new Error("Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.");
+      throw new Error(
+        "Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.",
+      );
     }
   }
-
 
   useEffect(() => {
     return () => {
@@ -166,11 +168,11 @@ function App() {
     setAuthMessage("Đang đăng nhập...");
     try {
       const data = await login(msgv, password);
-      setToken(data.access_token);
-      setLecturer(data.ho_ten);
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("lecturer", data.ho_ten);
-      setAuthMessage(`Xin chao ${data.ho_ten}`);
+      setToken(data.accessToken);
+      setLecturer(data.teacherName);
+      localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("lecturer", data.teacherName);
+      setAuthMessage(`Xin chao ${data.teacherName}`);
       setPassword("");
     } catch (error) {
       setAuthMessage(`Đăng nhập thất bại: ${error.message}`);
@@ -313,6 +315,10 @@ function App() {
     }
   }
 
+  function handleCreateSessionForClass(classId) {
+    setSessionMaLop(classId);
+  }
+
   async function handleCreateSession(e) {
     e.preventDefault();
     setSessionMessage("Đang tạo buổi học...");
@@ -322,21 +328,19 @@ function App() {
       const toISOString = (datetimeLocalValue) => {
         if (!datetimeLocalValue) return null;
         // datetime-local can have both "T" and space as separator
-        const normalized = datetimeLocalValue.replace(' ', 'T');
-        return normalized + ':00'; // add seconds
+        const normalized = datetimeLocalValue.replace(" ", "T");
+        return normalized + ":00"; // add seconds
       };
 
       const created = await createSession({
         token,
         maLop: sessionMaLop,
-        tieuDe: sessionTieuDe,
         scheduledStart: toISOString(sessionStart),
         scheduledEnd: toISOString(sessionEnd),
       });
-      const newId = created.buoi_hoc_id;
+      const newId = created.id;
       setSessionMessage(`Tạo buổi học thành công, ID: ${newId}`);
       setBuoiHocId(String(newId));
-      setSessionTieuDe("");
       setSessionStart("");
       setSessionEnd("");
       await loadSessions();
@@ -353,7 +357,9 @@ function App() {
         token,
         buoiHocId,
       });
-      setSessionMessage(`Bắt đầu buổi học thành công, Status: ${result.Status}`);
+      setSessionMessage(
+        `Bắt đầu buổi học thành công, Status: ${result.status}`,
+      );
       await loadSessions();
     } catch (error) {
       setSessionMessage(`Thất bại: ${error.message}`);
@@ -367,7 +373,9 @@ function App() {
         token,
         buoiHocId,
       });
-      setSessionMessage(`Kết thúc buổi học thành công, Status: ${result.Status}`);
+      setSessionMessage(
+        `Kết thúc buổi học thành công, Status: ${result.status}`,
+      );
       await loadSessions();
     } catch (error) {
       setSessionMessage(`Thất bại: ${error.message}`);
@@ -432,11 +440,10 @@ function App() {
     try {
       const data = await enrollFaceFile({
         token,
-        mssv: enrollMssv,
-        registeredByMsgv: msgv,
+        studentId: enrollMssv,
         file: enrollFile,
       });
-      setEnrollMessage(`Thành công. FaceDataID: ${data.face_data_id}`);
+      setEnrollMessage(`Thành công. FaceEmbeddingID: ${data.faceEmbeddingId}`);
       setEnrollFile(null);
     } catch (error) {
       setEnrollMessage(`Thất bại: ${error.message}`);
@@ -484,8 +491,9 @@ function App() {
       });
       setManualMessage(
         data.accepted
-          ? data.message || `PRESENT: ${data.mssv} (score: ${Number(data.confidence_score).toFixed(4)})`
-          : `Không đạt ngưỡng (score: ${Number(data.confidence_score ?? 0).toFixed(4)})`
+          ? data.message ||
+              `PRESENT: ${data.studentId} (score: ${Number(data.confidenceScore).toFixed(4)})`
+          : `Không đạt ngưỡng (score: ${Number(data.confidenceScore ?? 0).toFixed(4)})`,
       );
       await loadAttendanceStats();
       await loadAttendanceRecords();
@@ -556,12 +564,16 @@ function App() {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      const blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.92),
+      );
       if (!blob) throw new Error("Không tạo được frame");
 
       await validateSingleFaceInput(blob);
 
-      const file = new File([blob], `frame_${Date.now()}.jpg`, { type: "image/jpeg" });
+      const file = new File([blob], `frame_${Date.now()}.jpg`, {
+        type: "image/jpeg",
+      });
       const data = await checkinFaceFile({
         token,
         buoiHocId,
@@ -570,17 +582,21 @@ function App() {
       });
 
       if (data.accepted) {
-        setLastIdentity(data.mssv || "Unknown");
+        setLastIdentity(data.studentId || "Unknown");
       } else {
         setLastIdentity("Không xác định");
       }
-      setLastDistance(data.confidence_score ?? null);
+      setLastDistance(data.confidenceScore ?? null);
       setRtMessage(
         data.accepted
-          ? data.message || `Nhận diện được: ${data.mssv} | score: ${Number(data.confidence_score).toFixed(4)}`
-          : `Frame không đạt ngưỡng | score: ${Number(data.confidence_score ?? 0).toFixed(4)}`
+          ? data.message ||
+              `Nhận diện được: ${data.studentId} | score: ${Number(data.confidenceScore).toFixed(4)}`
+          : `Frame không đạt ngưỡng | score: ${Number(data.confidenceScore ?? 0).toFixed(4)}`,
       );
       await loadAttendanceStats();
+      if (data.accepted) {
+        await loadAttendanceRecords();
+      }
     } catch (error) {
       setRtMessage(`Realtime lỗi: ${normalizeFaceError(error.message)}`);
     } finally {
@@ -631,6 +647,7 @@ function App() {
     editingStudentMssv,
     setEditingStudentMssv,
     handleEditStudent,
+    handleCreateSessionForClass,
     enrollMssv,
     setEnrollMssv,
     enrollFile,
@@ -643,8 +660,6 @@ function App() {
     handleCreateSession,
     sessionMaLop,
     setSessionMaLop,
-    sessionTieuDe,
-    setSessionTieuDe,
     sessionStart,
     setSessionStart,
     sessionEnd,

@@ -8,7 +8,7 @@ import logging
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app import create_app
-from models import db, GiangVien, Lop, GiangVienLop, SinhVien
+from models import db, GiangVien, Lop, SinhVien, Enrollment
 
 logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO').upper(),
@@ -31,51 +31,50 @@ def seed_database():
                 return
 
             logger.info("Clearing existing data...")
-            GiangVienLop.query.delete()
+            Enrollment.query.delete()
             SinhVien.query.delete()
             Lop.query.delete()
             GiangVien.query.delete()
 
             lecturer = GiangVien(
-                MSGV='GV001',
-                HoTen='Nguyễn Văn A',
-                Password='123',
-                Email='gv001@example.edu',
-                IsActive=True
+                id='GV001',
+                name='Nguyễn Văn A',
+                email='123'
             )
             db.session.add(lecturer)
 
             class1 = Lop(
-                MaLop='CTK42',
-                TenLop='Công Nghệ Kỹ Thuật K42',
-                NienKhoa='2025-2026',
-                HocKy='HK2',
-                CreatedByMSGV='GV001'
+                id='CTK42',
+                name='Công Nghệ Kỹ Thuật K42',
+                teacher_id='GV001'
             )
             class2 = Lop(
-                MaLop='CNTT43',
-                TenLop='Công Nghệ Thông Tin K43',
-                NienKhoa='2025-2026',
-                HocKy='HK2',
-                CreatedByMSGV='GV001'
+                id='CNTT43',
+                name='Công Nghệ Thông Tin K43',
+                teacher_id='GV001'
             )
             db.session.add(class1)
             db.session.add(class2)
 
-            gv_lop1 = GiangVienLop(MSGV='GV001', MaLop='CTK42', VaiTro='OWNER')
-            gv_lop2 = GiangVienLop(MSGV='GV001', MaLop='CNTT43', VaiTro='OWNER')
-            db.session.add(gv_lop1)
-            db.session.add(gv_lop2)
-
             students = [
-                SinhVien(MSSV='SV001', Ho_Ten_SV='Trần Thị B', Lop='CTK42'),
-                SinhVien(MSSV='SV002', Ho_Ten_SV='Lê Văn C', Lop='CTK42'),
-                SinhVien(MSSV='SV003', Ho_Ten_SV='Phạm Minh D', Lop='CTK42'),
-                SinhVien(MSSV='SV004', Ho_Ten_SV='Hoàng Thị E', Lop='CNTT43'),
-                SinhVien(MSSV='SV005', Ho_Ten_SV='Đỗ Quang F', Lop='CNTT43'),
+                SinhVien(id='SV001', name='Trần Thị B'),
+                SinhVien(id='SV002', name='Lê Văn C'),
+                SinhVien(id='SV003', name='Phạm Minh D'),
+                SinhVien(id='SV004', name='Hoàng Thị E'),
+                SinhVien(id='SV005', name='Đỗ Quang F'),
             ]
             for student in students:
                 db.session.add(student)
+
+            enrollments = [
+                Enrollment(student_id='SV001', class_id='CTK42'),
+                Enrollment(student_id='SV002', class_id='CTK42'),
+                Enrollment(student_id='SV003', class_id='CTK42'),
+                Enrollment(student_id='SV004', class_id='CNTT43'),
+                Enrollment(student_id='SV005', class_id='CNTT43'),
+            ]
+            for enrollment in enrollments:
+                db.session.add(enrollment)
             
             db.session.commit()
             logger.info('Database seeded successfully')
