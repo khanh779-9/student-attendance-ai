@@ -55,21 +55,9 @@ CREATE TABLE enrollments (
     UNIQUE (student_id, class_id) -- tránh trùng
 );
 
--- =========================
--- 5. FACE EMBEDDINGS (AI)
--- =========================
-CREATE TABLE face_embeddings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id VARCHAR(20),
-    embedding TEXT NOT NULL, -- lưu JSON vector
-    image_path TEXT, -- optional
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (student_id) REFERENCES students(id)
-);
 
 -- =========================
--- 6. ATTENDANCE SESSIONS
+-- 5. ATTENDANCE SESSIONS
 -- =========================
 CREATE TABLE attendance_sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -83,7 +71,7 @@ CREATE TABLE attendance_sessions (
 );
 
 -- =========================
--- 7. ATTENDANCE RECORDS
+-- 6. ATTENDANCE RECORDS
 -- =========================
 CREATE TABLE attendance_records (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -117,9 +105,6 @@ INSERT INTO enrollments (student_id, class_id) VALUES
 ('SV002', 'L001'),
 ('SV001', 'L002');
 
-INSERT INTO face_embeddings (student_id, embedding, image_path) VALUES
-('SV001', '[0.1, 0.2, 0.3]', '/images/sv001.jpg'),
-('SV002', '[0.4, 0.5, 0.6]', '/images/sv002.jpg');
 
 INSERT INTO attendance_sessions (class_id, session_date, start_time, end_time) VALUES
 ('L001', '2024-09-01', '2024-09-01 08:00:00', '2024-09-01 09:00:00'),
