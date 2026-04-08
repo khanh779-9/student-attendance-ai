@@ -130,9 +130,9 @@ export default function NewClassPage({
               </tr>
             </thead>
             <tbody>
-              {classRows.map((row) => (
+              {classRows.map((row, idx) => (
                 <tr
-                  key={row.id}
+                  key={`${row.id}_${idx}`}
                   className="border-t border-slate-200 text-sm text-slate-700"
                 >
                   <td className="px-3 py-3">{row.id}</td>
@@ -219,9 +219,9 @@ export default function NewClassPage({
               </tr>
             </thead>
             <tbody>
-              {studentRows.map((row) => (
+              {studentRows.map((row, idx) => (
                 <tr
-                  key={row.id}
+                  key={`${row.id}_${idx}`}
                   className="border-t border-slate-200 text-sm text-slate-700"
                 >
                   <td className="px-3 py-3">{row.id}</td>

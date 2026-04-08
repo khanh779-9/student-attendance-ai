@@ -279,7 +279,7 @@ export default function MarkAttendencePage({
               <th className="px-3 py-3">Họ tên</th>
               <th className="px-3 py-3">Trạng thái</th>
               <th className="px-3 py-3">Giờ check-in</th>
-              <th className="px-3 py-3">Độ tin cậy</th>
+              {/* <th className="px-3 py-3">Độ tin cậy</th> */}
             </tr>
           </thead>
           <tbody>
@@ -297,11 +297,11 @@ export default function MarkAttendencePage({
                   <td className="px-3 py-3">
                     {formatCheckinTime(row.checkinTime)}
                   </td>
-                  <td className="px-3 py-3">
+                  {/* <td className="px-3 py-3">
                     {row.confidenceScore
                       ? Number(row.confidenceScore).toFixed(4)
                       : "-"}
-                  </td>
+                  </td> */}
                 </tr>
               ))
             ) : (

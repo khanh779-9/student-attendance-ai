@@ -1,3 +1,4 @@
+
 from flask import Blueprint, request, jsonify, current_app
 from models import SinhVien, Enrollment, db
 from auth import require_auth
@@ -8,178 +9,147 @@ from datetime import datetime
 from models import Lop
 from sqlalchemy import func
 
+# Define Blueprint at the top before using it
 face_bp = Blueprint('face', __name__, url_prefix='/api/face')
 logger = logging.getLogger(__name__)
 
-def allowed_file(filename):
-    """Check if file extension is allowed"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
-
-def save_enrollment_file(file, mssv):
-    """Save enrollment file to uploads/enrolls/<MSSV>/ folder"""
-    if not file or file.filename == '':
-        return None
-    
-    if not allowed_file(file.filename):
-        return None
-    
-    enrolls_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'enrolls', str(mssv))
-    os.makedirs(enrolls_folder, exist_ok=True)
-    
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S%f')
-    filename = f"{timestamp}_{file.filename}"
-    filepath = os.path.join(enrolls_folder, filename)
-    
-    file.save(filepath)
-    logger.info("Enrollment image saved to: %s", filepath)
-    return filepath
-
+# Diagnostic API: Kiểm tra trạng thái khuôn mặt sinh viên trong lớp
+@face_bp.route('/class-diagnostic/<class_id>', methods=['GET'])
+@require_auth
+def class_face_diagnostic(class_id):
+    try:
+        # Get all enrollments for this class
+        enrollments = Enrollment.query.filter_by(class_id=class_id).all()
+        student_ids = [enr.student_id for enr in enrollments]
+        students = SinhVien.query.filter(SinhVien.id.in_(student_ids)).all() if student_ids else []
+        total_students = len(students)
+        students_with_faces = 0
+        students_without_faces = 0
+        student_list = []
+        for sv in students:
+            npy_path = os.path.join('data', 'student', f'{sv.id}.npy')
+            abs_npy_path = os.path.abspath(npy_path)
+            has_face = os.path.exists(npy_path)
+            face_count = 0
+            if has_face:
+                try:
+                    import numpy as np
+                    vectors = np.load(npy_path)
+                    logger.info(f"[DIAG] Đọc file npy: {abs_npy_path}, shape={vectors.shape}, dtype={vectors.dtype}")
+                    if len(vectors.shape) > 1:
+                        face_count = vectors.shape[0]
+                    elif len(vectors.shape) == 1:
+                        face_count = 1
+                    else:
+                        face_count = 0
+                    if face_count == 0:
+                        logger.warning(f"[DIAG] File npy hợp lệ nhưng không có vector: {abs_npy_path}, shape={vectors.shape}")
+                except Exception as ex:
+                    logger.error(f"[DIAG] Lỗi đọc file npy {abs_npy_path}: {ex}")
+                    face_count = 0
+            else:
+                logger.warning(f"[DIAG] Không tìm thấy file npy: {abs_npy_path}")
+            if face_count > 0:
+                students_with_faces += 1
+            else:
+                students_without_faces += 1
+            student_list.append({
+                'studentId': sv.id,
+                'studentName': sv.name,
+                'faceCount': face_count,
+            })
+        return jsonify({
+            'classId': class_id,
+            'totalStudents': total_students,
+            'studentsWithFaces': students_with_faces,
+            'studentsWithoutFaces': students_without_faces,
+            'students': student_list,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        
 @face_bp.route('/enroll-file', methods=['POST'])
 @require_auth
 def enroll_face():
-    """Enroll face for a student using uploaded image (supports multiple images per student)"""
+    """Enroll face for a student using uploaded image(s) (supports multiple images per student)"""
     try:
         mssv = request.form.get('student_id') or request.form.get('mssv')
-        registered_by_msgv = request.form.get('registered_by_msgv', request.msgv)
-        file = request.files.get('file')
+        registered_by_msgv = request.form.get('registered_by_msgv', getattr(request, 'msgv', None))
+        files = request.files.getlist('images')
+        if not files or len(files) == 0:
+            file = request.files.get('file')
+            if file:
+                files = [file]
 
-        logger.info("Enrollment request: mssv=%s msgv=%s", mssv, request.msgv)
-        
+        logger.info("Enrollment request: mssv=%s msgv=%s, num_files=%d", mssv, registered_by_msgv, len(files) if files else 0)
+
         if not mssv:
             return jsonify({'error': 'Missing student_id in form data'}), 400
-        if not file:
-            return jsonify({'error': 'Missing file in request'}), 400
-        
+        if not files or len(files) == 0:
+            return jsonify({'error': 'Missing file(s) in request'}), 400
+
         student = SinhVien.query.filter_by(id=mssv).first()
         if not student:
             return jsonify({'error': f'Student {mssv} not found'}), 404
-
-        filepath = save_enrollment_file(file, mssv)
-        if not filepath:
-            return jsonify({'error': 'Invalid file format. Allowed: jpg, jpeg, png, gif'}), 400
-
-        logger.info("Enrollment file saved: %s", filepath)
 
         from face_service import FaceRecognitionService
         service = FaceRecognitionService(
             current_app.config['ARCFACE_MODEL_PATH']
         )
 
-        face_count = service.detect_face_count(filepath)
-        if face_count == 0:
-            os.remove(filepath)
-            return jsonify({'error': 'Không phát hiện khuôn mặt trong ảnh.'}), 400
-        if face_count and face_count > 1:
-            os.remove(filepath)
-            return jsonify({'error': 'Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.'}), 400
-        
-        embedding = service.extract_embedding(filepath)
-        if embedding is None:
-            os.remove(filepath)
-            return jsonify({'error': 'Failed to extract face embedding. Please upload a clear face image'}), 400
-
-        logger.info("Embedding extracted for %s", mssv)
-
-        existing_faces = SinhVienKhuonMat.query.filter_by(student_id=mssv).all()
-        is_first_face = len(existing_faces) == 0
-
-        face_record = SinhVienKhuonMat(
-            student_id=mssv,
-            image_path=filepath,
-            embedding=json.dumps(embedding)
-        )
-        
-        db.session.add(face_record)
-        db.session.commit()
-
-        logger.info("Khuôn mặt được đăng kí thành công. Tổng khuôn mặt cho %s: %s", mssv, len(existing_faces) + 1)
-        
-        return jsonify({
-            'faceEmbeddingId': face_record.FaceDataID,
-            'isPrimary': is_first_face,
-            'totalFaces': len(existing_faces) + 1,
-            'message': f'Khuôn mặt được đăng kí thành công. Tổng khuôn mặt: {len(existing_faces) + 1}' if not is_first_face else 'Khuôn mặt được đăng kí thành công (khuôn mặt chính)'
-        }), 201
-    
-    except Exception as e:
-        db.session.rollback()
-        logger.exception("Enrollment error: %s", str(e))
-        return jsonify({'error': str(e)}), 500
-
-
-@face_bp.route('/list/<student_id>', methods=['GET'])
-@require_auth
-def get_enrolled_faces(student_id):
-    """Get all enrolled face vectors for a student (file-based)"""
-    try:
+        results = []
         import numpy as np
-        data_dir = os.path.join(current_app.root_path, 'Data', 'student')
-        npy_path = os.path.join(data_dir, f'{student_id}.npy')
-        if not os.path.exists(npy_path):
-            return jsonify([]), 200
-        vectors = np.load(npy_path)
-        if vectors.ndim == 1:
-            vectors = [vectors]
-        result = [
-            {
-                'index': i,
-                'studentId': student_id,
-                'vector': vec.tolist()
-            }
-            for i, vec in enumerate(vectors)
-        ]
-        return jsonify(result), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@face_bp.route('/class-diagnostic/<class_id>', methods=['GET'])
-@require_auth
-def class_face_diagnostic(class_id):
-    """Get face enrollment status for all students in a class (file-based)"""
-    try:
-        logger.info("Checking face status for class %s", class_id)
-        from models import Lop
-        lop = Lop.query.filter_by(id=class_id).first()
-        if not lop:
-            return jsonify({'error': f'Class {class_id} not found'}), 404
-        students = (
-            db.session.query(SinhVien)
-            .join(Enrollment, Enrollment.student_id == SinhVien.id)
-            .filter(Enrollment.class_id == class_id)
-            .all()
-        )
-        import numpy as np
-        data_dir = os.path.join(current_app.root_path, 'Data', 'student')
-        result = {
-            'classId': class_id,
-            'totalStudents': len(students),
-            'studentsWithFaces': 0,
-            'studentsWithoutFaces': 0,
-            'students': []
-        }
-        for student in students:
-            npy_path = os.path.join(data_dir, f'{student.MSSV}.npy')
-            if os.path.exists(npy_path):
+        from PIL import Image
+        import tempfile, os
+        for file in files:
+            try:
+                img = Image.open(file.stream)
+                img = img.convert('RGB')
+                fd, tmp_path = tempfile.mkstemp(suffix='.png')
+                os.close(fd)
                 try:
-                    vectors = np.load(npy_path)
-                    face_count = vectors.shape[0] if vectors.ndim > 1 else 1
-                except Exception:
-                    face_count = 0
-            else:
-                face_count = 0
-            student_info = {
-                'studentId': student.MSSV,
-                'studentName': student.Ho_Ten_SV,
-                'faceCount': int(face_count or 0),
-                'status': 'CÓ_KHUÔN_MẶT' if face_count > 0 else 'KHÔNG_CÓ_KHUÔN_MẶT'
-            }
-            result['students'].append(student_info)
-            if face_count > 0:
-                result['studentsWithFaces'] += 1
-            else:
-                result['studentsWithoutFaces'] += 1
-        return jsonify(result), 200
+                    img.save(tmp_path)
+                    face_count = service.detect_face_count(tmp_path)
+                    if face_count == 0:
+                        results.append({'filename': file.filename, 'error': 'Không phát hiện khuôn mặt trong ảnh.'})
+                        os.remove(tmp_path)
+                        continue
+                    if face_count and face_count > 1:
+                        results.append({'filename': file.filename, 'error': 'Phát hiện nhiều khuôn mặt trong ảnh. Vui lòng chỉ để 1 khuôn mặt.'})
+                        os.remove(tmp_path)
+                        continue
+                    embedding = service.extract_embedding(tmp_path)
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                if embedding is None:
+                    results.append({'filename': file.filename, 'error': 'Failed to extract face embedding. Please upload a clear face image'})
+                    continue
+                logger.info("Embedding extracted for %s", mssv)
+                data_dir = os.path.join('data', 'student')
+                os.makedirs(data_dir, exist_ok=True)
+                npy_path = os.path.join(data_dir, f'{mssv}.npy')
+                logger.info(f"[DEBUG] Sẽ lưu file npy tại: {os.path.abspath(npy_path)}")
+                embedding_np = np.array(embedding)
+                if os.path.exists(npy_path):
+                    try:
+                        old = np.load(npy_path)
+                        if old.ndim == 1:
+                            old = old.reshape(1, -1)
+                        new = np.vstack([old, embedding_np])
+                    except Exception as e:
+                        logger.exception("Error loading existing npy file: %s", str(e))
+                        new = embedding_np.reshape(1, -1)
+                else:
+                    new = embedding_np.reshape(1, -1)
+                np.save(npy_path, new)
+                logger.info(f"[DEBUG] Đã lưu file npy: {os.path.exists(npy_path)} tại {os.path.abspath(npy_path)}")
+                results.append({'filename': file.filename, 'success': True, 'message': 'Khuôn mặt được đăng kí thành công.'})
+            except Exception as e:
+                logger.exception("Enrollment error for file %s: %s", file.filename, str(e))
+                results.append({'filename': file.filename, 'error': str(e)})
+
+        return jsonify({'results': results}), 200
     except Exception as e:
-        logger.exception("Error in class_face_diagnostic: %s", str(e))
+        logger.exception("Enrollment error: %s", str(e))
         return jsonify({'error': str(e)}), 500

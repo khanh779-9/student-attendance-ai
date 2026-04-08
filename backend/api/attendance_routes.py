@@ -95,7 +95,7 @@ def checkin_face():
         import numpy as np
         enrolled_embeddings = []
         for student in class_students:
-            npy_path = os.path.join(current_app.root_path, 'Data', 'student', f'{student.MSSV}.npy')
+            npy_path = os.path.join(current_app.root_path, 'data', 'student', f'{student.MSSV}.npy')
             if not os.path.exists(npy_path):
                 continue
             try:
@@ -153,8 +153,7 @@ def checkin_face():
 
         mssv = str(result['face_data']['mssv'])
         student_name = str(result['face_data']['student_name'])
-        face_data_id = int(result['face_data']['face_data_id'])
-        
+        # face_data_id không còn cần thiết, bỏ dòng này để tránh lỗi
         logger.info("Recognition accepted: MSSV=%s Name=%s Confidence=%.4f", mssv, student_name, confidence)
 
         existing_checkin = DiemDanh.query.filter_by(

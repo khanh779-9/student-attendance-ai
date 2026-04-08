@@ -150,6 +150,14 @@ function App() {
     }
   }
 
+
+  // Tắt camera khi rời tab điểm danh
+  useEffect(() => {
+    if (activeTab !== "attendance") {
+      stopRealtime();
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     return () => {
       stopRealtime();
@@ -480,14 +488,18 @@ function App() {
       setManualMessage("Vui lòng chọn ảnh check-in");
       return;
     }
+    if (!buoiHocId || isNaN(Number(buoiHocId))) {
+      setManualMessage("Vui lòng nhập đúng Buổi học ID");
+      return;
+    }
     setManualMessage("Đang nhận diện...");
     try {
       await validateSingleFaceInput(manualFile);
       const data = await checkinFaceFile({
         token,
-        buoiHocId,
+        buoiHocId: Number(buoiHocId),
         file: manualFile,
-        threshold,
+        threshold: threshold ? String(threshold) : "",
       });
       setManualMessage(
         data.accepted
@@ -574,11 +586,15 @@ function App() {
       const file = new File([blob], `frame_${Date.now()}.jpg`, {
         type: "image/jpeg",
       });
+      if (!buoiHocId || isNaN(Number(buoiHocId))) {
+        setRtMessage("Vui lòng nhập đúng Buổi học ID");
+        return;
+      }
       const data = await checkinFaceFile({
         token,
-        buoiHocId,
+        buoiHocId: Number(buoiHocId),
         file,
-        threshold,
+        threshold: threshold ? String(threshold) : "",
       });
 
       if (data.accepted) {

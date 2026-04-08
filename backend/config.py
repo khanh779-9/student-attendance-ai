@@ -43,7 +43,7 @@ class Config:
     FACE_RECOGNITION_THRESHOLD = float(os.getenv('FACE_RECOGNITION_THRESHOLD', '0.68'))
     
     # File uploads
-    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
+    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'data/student')
     MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
     
